@@ -1,5 +1,5 @@
 # CyberGuard-Automation-Suite
-Project2 Network Research/ Rotem Gil
+Project2 Network Research/ Me
 Running the script:
 sudo ./Project2
 
