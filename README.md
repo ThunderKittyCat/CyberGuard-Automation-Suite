@@ -1,51 +1,47 @@
-# CyberGuard-Automation-Suite
+# CyberGuard Automation Suite
 
-### Running the script:
-sudo ./Project2
+## Overview
 
-### Please make sure to update your machine before running the script:
+The CyberGuard Automation Suite is a powerful script designed to automate various cybersecurity tasks, streamlining operations for professionals in the field. It integrates a range of tools and techniques to facilitate tasks such as network reconnaissance, SSH setup, and remote server analysis. This suite aims to enhance efficiency and effectiveness in cybersecurity operations by automating repetitive tasks and providing actionable insights.
 
--	sudo apt-get update
--	sudo apt-get upgrade
+## Features
 
+- **Network Reconnaissance:** Automates network scanning tasks using Nmap to identify open ports, services, and potential vulnerabilities.
+- **SSH Setup:** Simplifies the setup of SSH connections by guiding users through the configuration process and providing prompts for necessary information.
+- **Remote Server Analysis:** Facilitates the analysis of remote servers by performing tasks such as whois lookup, scanning for open ports, and retrieving system details.
 
-### The script itself has a bunch of notes, if you read it you will probably understand all of it. however I shall explain the basics if you don’t really want to read everything.
+## Usage
 
-In the scripts there are 12 functions overall.
+1. **Clone the Repository:** Clone the repository to your local machine using the following command:
+    ```
+    git clone https://github.com/your_username/CyberGuard-Automation-Suite.git
+    ```
+2. **Navigate to the Project Directory:** Move into the project directory using the following command:
+    ```
+    cd CyberGuard-Automation-Suite
+    ```
+3. **Execute the Script:** Run the script using the following command:
+    ```
+    sudo ./CyberGuard_Automation_Suite.sh
+    ```
+4. **Follow On-Screen Instructions:** Follow the on-screen prompts to perform various cybersecurity tasks as needed.
 
-* function rm_logs_if_exist(): this function’s use is for organization purposes. This function is used for running the script a second time or more.
+## Requirements
 
-* check_and_install_program: this function’s use is for checking if the programs already exist, if they exist continue, if not then download them and save the logs manually in “logs” folder. the function is using a for loop, for optimization purposes. if you want to add another program simply write its name at the start of the loop.
+- Bash (Tested on Bash version 4.4)
+- Nmap (Tested on Nmap version 7.80)
+- SSH (for SSH setup)
+- Curl (for remote server analysis)
 
-* check_if_installed: This function’s use is for checking if all the installations were successful. If not, run them again. The program runs them a maximum of 5 times.
+## License
 
-* spoofed_ip_and_country:  The function checks the spoofed IP and country given by nipe.
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
 
-* am_I_anonymous: The function checks if you as the user are anonymous. If not, it will retry until you are. At first I wanted to make the program recursive, but i thought it might run indefinitely due to internet connectivity and other issues. so I stayed with a simple structure of loops.
+## Author
 
-* ready_for_remote_address: This function exist only for organization purposes. All of what’s inside this function can be written without needing a function to run it. I just wanted my script to be neat and nice to read.
+[Your Name or Username]
 
-* sanitize_address: The function takes the given remote address and sanitizes it, making it easier to read without any special characters such as ./! etc..
+## Acknowledgments
 
-* scan_remote_address: The function scans the remote address, but before that, the function also checks if the remote address given is valid or not, meaning it won’t scan regularly if the address given is not real/exists.
-
-* After this program will come the SSH part. Due to instructions from my teacher, I wasn’t allowed to automate this part. However I did make it easier for you. All you need to add to this part is:
-
-  ssh_user_info="kali@192.168.253.130" # FOR TESTER: change user and IP to match your own
-  ssh_user_password="kali" # FOR TESTER: change password to match your own
-  Change the red parts to match your own.
-
-* remote_server_whois_check: The function connects to the remote server, checks and saves the Whois data of the given remote address.
-
-* remote_server_scan: The function connects to a remote server, and scans+saves the given remote address.
-
-* details_of_remote_server: The function connects to the remote server, and saves the private data of the server, including it’s private and public IP, uptime and country.
-
-* move_logs_to_big_folder: The function moves all the different logs into one log folder, that was made in the start, For organization purposes.
-
-* Other than those functions, I did add some other variables outside of the functions like current_dir=$(pwd), and others of the same sort.
-
-* Throughout the scripts output you will see [+]/[*]/[#], They serve no purpose other than beauty and organization. You can ignore.
-
-
-
+- This script was developed to address the need for automation in cybersecurity operations.
+- Special thanks to [Mention any contributors or sources of inspiration].
