@@ -1,0 +1,262 @@
+#!/bin/bash
+
+# Remove the logs folder, in case it was already existing before. Removing it would solve some issues with the code, and provide a whole restart for a second run of the script
+function rm_logs_if_exist() {
+	# Check if the "logs" directory exists
+	if [ -d "logs" ]; then
+		echo "[#] Removing the logs directory for more use of the script..."
+		sudo rm -r "logs"
+	fi
+}
+rm_logs_if_exist
+
+mkdir logs &>/dev/null # Make a log folder for all the different logs
+mkdir program_logs &>/dev/null # Make a log folder for the installation logs of the programs
+
+function check_and_install_program() {
+    for x in sshpass tor cpanm ssh nmap whois jq torsocks; do
+		sleep 1
+        if [ -z "$(which $x)" ]; then
+            echo "[!] $x is not installed, installing.."
+            sleep 1
+            echo "[#] All installation logs are saved in program_logs folder"
+            LOG_FILE="program_logs/$x.log.txt"  # Create log file for each package inside the log folder
+            if [ "$x" == "cpanm" ]; then
+                sudo apt-get install -y cpanminus > "$LOG_FILE" 2>&1  # Redirect output for cpanm installation
+            fi
+            sudo apt-get install -y $x > "$LOG_FILE" 2>&1  # Redirect both stdout and stderr to the log file
+        else
+            echo "[#] $x is installed, YAY :D"
+        fi
+    done
+    
+    LOG_FILE="program_logs/nipe.log.txt"
+    echo "[!] This might take a few seconds.."
+    if [ -z "$(sudo find / -name nipe 2>/dev/null)" ]; then
+		echo "[!] Nipe is not installed..Installing now.."
+		
+		# Store the current directory in a variable
+        current_dir=$(pwd)
+        
+		# Install nipe
+		(git clone https://github.com/htrgouvea/nipe && cd nipe && sudo cpanm --installdeps . && sudo perl nipe.pl install) >> "$LOG_FILE" 2>&1
+		
+		# Return to the original directory
+        cd "$current_dir"
+        
+		# Check if nipe installation was successful
+        if [ $? -eq 0 ]; then
+            echo "[#] nipe is installed, continuing.."
+            nipe_installed=true
+        else
+            echo "[!] Failed to install nipe."
+            nipe_installed=false
+        fi
+	else
+		echo "[#] Nipe is installed. YAY :D"
+		nipe_installed=true
+	fi
+	echo "[*] All the download logs are saved manually in logs folder"
+}
+
+function check_if_installed() {
+	# Set a maximum retry count
+	MAX_RETRY=5
+	retry_count=0
+	nipe_installed=false
+
+	while true; do
+		# Run check_and_install_program function to install or check the status of packages
+		check_and_install_program
+		# Check if all required packages are installed
+		if [ -n "$(which sshpass)" ] && [ -n "$(which tor)" ] && [ -n "$(which cpanminus)" ] && [ -n "$(which ssh)" ] && [ -n "$(which nmap)" ] && [ -n "$(which whois)" ] && [ -n "$(which jq)" ] && [ -n "$(which torsocks)" ]; then
+			((retry_count++)) # Increment the retry count
+			# Check if max retries exceeded
+			if [ "$retry_count" -ge "$MAX_RETRY" ]; then
+				echo "[!] Max retries exceeded. Unable to install all required packages."
+				echo "[?] Maybe try and check your internet connectivity"
+				exit 1
+			fi
+			echo "[!] Retrying in 5 seconds..."
+			sleep 5  # Add a delay of 5 seconds before the next retry
+			continue
+		else
+			if [ "$nipe_installed" = true ]; then
+				break
+			else
+				check_and_install_program # Install nipe one more time if not installed successfully
+			fi
+			break
+		fi
+	done
+}
+
+# Check and install required programs
+check_if_installed
+
+function spoofed_ip_and_country() {
+    spoofed_country_ip=$(sudo perl nipe.pl status | awk -F ': ' 'NR==3 {print $2}') # Finds the spoofed IP
+
+    # Use an IP geolocation API to get country information
+    api_url="http://ip-api.com/json/$spoofed_country_ip?fields=countryCode,country"
+    response=$(curl -s "$api_url")
+
+    # Extract the ISO country code and country name from the API response using jq
+    iso_country_code=$(echo "$response" | jq -r '.countryCode')
+    full_country_name=$(echo "$response" | jq -r '.country')
+
+    echo "[#] Your Spoofed IP Address: $spoofed_country_ip"
+    sleep 1
+    echo "[#] Your Spoofed Country Name: $full_country_name"
+}
+
+current_dir=$(pwd) # Save the current path
+
+function am_I_anonymous() {
+    nipe_dir=$(sudo find / -name nipe 2>/dev/null)
+    cd "$nipe_dir" &>/dev/null # Change directory to nipe & Suppress any printed messages
+
+    status_output=$(sudo perl nipe.pl status) 
+
+    if echo "$status_output" | grep -qi "Status: true"; then
+        figlet "You are anonymous"
+        spoofed_ip_and_country
+    else
+        if echo "$status_output" | grep -qi "Error"; then
+            echo "There is an error with nipe, exiting and retrying.."
+            cd "$current_dir"
+            cd "$nipe_dir"
+            sudo perl nipe.pl restart # Restarting nipe to fix the error
+            sudo perl nipe.pl start   # Starting the service to ensure that the service is on
+        fi
+
+        for attempt in {1..5}; do
+            status_output=$(sudo perl nipe.pl status)
+            if echo "$status_output" | grep -qi "Status: true"; then
+                figlet "You are anonymous"
+                break
+            else
+                sleep 1
+                echo "You are not anonymous! Retrying.."
+                cd "$current_dir"
+                cd "$nipe_dir"
+                sudo perl nipe.pl restart   # Starting the service to ensure that the service is on
+                sudo perl nipe.pl start # Starting the service to ensure that the service is on
+            fi
+        done
+    fi
+    echo ""
+}
+
+# Check if anonymous and display spoofed IP and country
+am_I_anonymous
+
+function ready_for_remote_address() {
+	
+	sleep 1
+	echo "" 
+	# Allow the user to specify the remote address to scan
+	echo "[*] Please enter the remote address you would like to scan: "
+	read remote_address
+}
+
+# Make some space between responses, Also ask the user for input
+ready_for_remote_address
+
+
+mkdir -p scan_logs # Create a log folder for the scan log
+
+function sanitize_address {
+    # Remove any characters that are not letters, numbers, or underscores
+    sanitized_address=$(echo "$remote_address" | tr -cd '[:alnum:]_')
+    echo "$sanitized_address"
+}
+
+check_if_scan_is_valid=$(nmap -sn "$remote_address" | grep -i "Failed" &>/dev/null) # Setting up a variable for later use in the program. Organizing&Saving space
+
+function scan_remote_address {
+	
+	echo "[#] Checking if the remote address is valid.."
+    if [ -z "$check_if_scan_is_valid" ]; then
+        echo "[+] Address is valid. Starting the scan..."
+        sleep 1
+        sanitized_address=$(sanitize_address)
+        LOG_FILE="scan_logs/${sanitized_address}.log.txt"
+        echo "[*] This might take a few seconds.."
+        nmap "$remote_address" > "$LOG_FILE" 2>&1 # Nmap -sC will take too long so we will settle for no flags, for fast results
+        echo ""
+        echo "[+] Scan data is saved in the scan_logs folder"
+        sleep 1
+    else
+        echo "[!] Address is not valid or unreachable."
+    fi
+}
+
+# Scans the given remote address, also checks it's validity
+scan_remote_address
+
+
+ssh_user_info="kali@192.168.253.130" # FOR TESTER: change user and IP to match your own
+ssh_user_password="kali" # FOR TESTER: change password to match your own
+
+mkdir remote_multiple_commands_logs &>/dev/null  # Create a log folder for the scan logs
+mkdir remote_whois_logs &>/dev/null # Create a log folder for the whois logs
+
+function remote_server_whois_check() {
+	# Get the remote server to check the whois of the remote address
+	LOG_FILE="remote_whois_logs/${sanitized_address}.log.txt"
+	sshpass -p $ssh_user_password ssh -o StrictHostKeyChecking=no $ssh_user_info "whois $remote_address" > "$LOG_FILE" 2>&1
+	echo "[+] Scan data is saved in the remote_whois_logs folder"
+	sleep 1
+}
+
+# Connect to remote server, scan remote address's whois info, and save it into a folder.
+remote_server_whois_check
+
+mkdir remote_scan_logs &>/dev/null # Create a log folder for the whois logs
+
+function remote_server_scan {
+	# Get the remote server to scan the given remote address
+	LOG_FILE="remote_scan_logs/${sanitized_address}.log.txt"
+	sshpass -p $ssh_user_password ssh -o StrictHostKeyChecking=no $ssh_user_info "nmap $remote_address" > "$LOG_FILE" 2>&1
+	echo "[+] Scan data is saved in the remote_scan_logs folder"
+}
+
+# Connect to remote server, scan remote address and save output
+remote_server_scan
+
+function details_of_remote_server() {
+	
+	private_ip=$(sshpass -p "$ssh_user_password" ssh -o StrictHostKeyChecking=no "$ssh_user_info" "echo '[#] The remote private IP is:'  | hostname -I")
+    public_ip=$(sshpass -p "$ssh_user_password" ssh -o StrictHostKeyChecking=no "$ssh_user_info" "curl -s https://api64.ipify.org")
+    uptime=$(sshpass -p "$ssh_user_password" ssh -o StrictHostKeyChecking=no "$ssh_user_info" "echo '[#] The remote uptime is: '| uptime")
+    
+    # Use an IP geolocation API to get country information
+    api_url="http://ip-api.com/json/$public_ip?fields=countryCode,country"
+    response=$(curl -s "$api_url")
+    
+    # Extract the ISO country code and country name from the API response using jq
+    iso_country_code=$(echo "$response" | jq -r '.countryCode')
+    full_country_name=$(echo "[#] The country name is: " | echo "$response" | jq -r '.country')
+    
+	# Get the remote server to scan the given remote address
+	LOG_FILE="remote_multiple_commands_logs/ip_uptime_country.log.txt"
+    sshpass -p "$ssh_user_password" ssh -o StrictHostKeyChecking=no "$ssh_user_info" " $private_ip ; echo '[#] The remote public IP is: ' | $public_ip ; $uptime ; $full_country_name" > "$LOG_FILE" 2>&1
+    echo "[+] Scan data is saved in the remote_multiple_commands_logs folder"
+}
+
+# Connect to remote server and get private details
+details_of_remote_server
+
+function move_logs_to_big_folder() {
+    # Move the logs to the centralized log folder
+    mv remote_multiple_commands_logs "$current_dir"/logs
+    mv remote_scan_logs "$current_dir"/logs
+    mv remote_whois_logs "$current_dir"/logs
+    mv scan_logs "$current_dir"/logs
+    cd $current_dir
+    mv program_logs "$current_dir"/logs
+}
+
+# For organiziation reasons, move all the different logs, into one folder
+move_logs_to_big_folder
